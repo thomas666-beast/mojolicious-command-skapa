@@ -161,27 +161,41 @@ package $package;
 use Mojo::Base 'Mojolicious::Plugin', -signatures;
 
 # WHAT IS THIS?
-# Mojolicious has no dedicated "middleware" class. What Laravel calls
-# middleware is expressed here as a plugin that installs an
-# `around_action` hook. The hook wraps every dispatched action:
+# A middleware is just a plugin. Where you load it decides its scope.
 #
-#   - code before `my \$result = \$next->()`  runs BEFORE the action
-#   - code after  `my \$result = \$next->()`  runs AFTER  the action
+# TWO WAYS TO USE IT
 #
-# Return \$result unchanged to keep the normal response flow.
-# Return something else (e.g. \$c->render(...)) to short-circuit.
+# 1) ROUTE-SCOPED (only some routes)
+#    From a route file, chain on the returned subtree:
+#
+#      my \$r = \$app->plugin('${package}');
+#      \$r->get('/dashboard' => sub (\$c) { ... });   # guarded
+#      \$r->get('/users'     => sub (\$c) { ... });   # guarded
+#
+#    Routes added to the main \$app->routes are NOT guarded.
+#
+# 2) GLOBAL (every dispatched action)
+#    From startup, install it as a hook instead of returning a subtree:
+#
+#      \$app->plugin('${package}', { global => 1 });
+#
+#    In that mode register installs around_action and wraps every action.
 
 sub register (\$self, \$app, \$conf) {
-  \$app->hook(around_action => sub (\$next, \$c, \$action, \$last) {
-    # --- before action ---
-    # \$c->app->log->debug('before: ' . \$c->req->url->path);
+  if (\$conf->{global}) {
+    \$app->hook(around_action => sub (\$next, \$c, \$action, \$last) {
+      # --- before action ---
+      my \$result = \$next->();
+      # --- after action ---
+      return \$result;
+    });
+    return;
+  }
 
-    my \$result = \$next->();
-
-    # --- after action ---
-    # \$c->res->headers->header('X-$name' => '1');
-
-    return \$result;
+  # --- route-scoped mode (default) ---
+  return \$app->routes->under(sub (\$c) {
+    # return 1 to allow, 0 to stop (e.g. after \$c->redirect_to)
+    return 1;
   });
 }
 
@@ -197,8 +211,13 @@ EOF
 
   say "Created: $file";
   say '';
-  say "Load it in $startup_file by adding this line to startup:";
-  say "  plugin '$plugin_line';";
+  say 'Use it route-scoped (in a route file):';
+  say "  my \$r = \$app->plugin('$package');";
+  say '  $r->get(...)   # guarded';
+  say '';
+  say 'Or globally (in startup):';
+  say "  plugin '$plugin_line', { global => 1 };";
+  say "  ($startup_file)";
 }
 
 sub _make_secret ($self) {
