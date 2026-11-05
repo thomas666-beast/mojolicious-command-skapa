@@ -20,7 +20,7 @@ Subcommands:
   make:request    <Name>   Create a FormRequest validation class under lib/<App>/Requests/
   make:translatable [locale]  Create i18n/<locale>.json (default: en)
   make:policy     <Name>   Create a policy under lib/<App>/Policy/
-  serve                    Run the app with morbo (dev server)
+  serve [-l URL]           Run the app with morbo (default: http://*:3000)
   make:secret              Generate an app secret and write to the config file
 USAGE
 
@@ -554,8 +554,13 @@ sub _serve ($self, @args) {
     return 1;
   }
 
-  exec 'morbo', $script->to_string, @args;
+  # exec replaces this process; only returns on failure
+  { no warnings 'exec'; exec 'morbo', $script->to_string, @args; }
+
   say "Failed to exec morbo: $!";
+  say '';
+  say 'If port 3000 is busy, pick another listen address:';
+  say "  APPLICATION skapa serve -l http://*:4000";
   return 1;
 }
 
