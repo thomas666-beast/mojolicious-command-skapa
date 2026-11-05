@@ -20,6 +20,7 @@ Subcommands:
   make:request    <Name>   Create a FormRequest validation class under lib/<App>/Requests/
   make:translatable [locale]  Create i18n/<locale>.json (default: en)
   make:policy     <Name>   Create a policy under lib/<App>/Policy/
+  serve                    Run the app with morbo (dev server)
   make:secret              Generate an app secret and write to the config file
 USAGE
 
@@ -40,6 +41,7 @@ sub run ($self, @args) {
   elsif ($sub eq 'make:request')      { $self->_make_request(@args) }
   elsif ($sub eq 'make:policy')       { $self->_make_policy(@args) }
   elsif ($sub eq 'make:translatable') { $self->_make_translatable(@args) }
+  elsif ($sub eq 'serve')             { $self->_serve(@args) }
   else                                { say "Unknown skapa subcommand: $sub"; say $self->usage }
 }
 
@@ -540,6 +542,21 @@ EOF
   say 'Use it in a controller:';
   say "  \$c->authorize('update', \$object);";
   say "  my \$ok = \$c->allowed('view', \$object);";
+}
+
+sub _serve ($self, @args) {
+  my $app     = ref $self->app;
+  my $moniker = decamelize($app);
+  my $script  = path($self->app->home, 'script', $moniker);
+
+  unless (-f $script) {
+    say "Script not found: $script";
+    return 1;
+  }
+
+  exec 'morbo', $script->to_string, @args;
+  say "Failed to exec morbo: $!";
+  return 1;
 }
 
 1;
