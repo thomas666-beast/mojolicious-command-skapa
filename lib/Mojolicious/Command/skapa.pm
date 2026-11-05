@@ -14,8 +14,9 @@ Subcommands:
   make:route      <Name>   Create a route group under lib/<App>/Route/
   make:middleware <Name>   Create a middleware under lib/<App>/Middleware/
   make:command    <name>   Create an app command under lib/<App>/Command/
-  make:secret              Generate an app secret and write to the config file
   make:helper     <Name>   Create a plugin with an $app->helper stub under lib/<App>/Plugin/
+  make:test       <name>   Create t/<name>.t with a Test::Mojo skeleton
+  make:secret              Generate an app secret and write to the config file
 USAGE
 
 sub run ($self, @args) {
@@ -30,6 +31,7 @@ sub run ($self, @args) {
   elsif ($sub eq 'make:command')      { $self->_make_command(@args) }
   elsif ($sub eq 'make:secret')       { $self->_make_secret(@args) }
   elsif ($sub eq 'make:helper')       { $self->_make_helper(@args) }
+  elsif ($sub eq 'make:test')         { $self->_make_test(@args) }
   else                                { say "Unknown skapa subcommand: $sub"; say $self->usage }
 }
 
@@ -342,6 +344,34 @@ EOF
   say '';
   say "Then use it in controllers/templates:";
   say "  \$c->$helper_name";
+}
+
+sub _make_test ($self, $name) {
+  unless ($name) { say 'Usage: APPLICATION skapa make:test <name>'; return }
+
+  my $app     = $self->_app_class;
+  my $moniker = decamelize($name);
+  my $file    = path($self->app->home, 't', "$moniker.t");
+
+  if (-e $file) { say "File already exists: $file"; return }
+
+  my $content = <<"EOF";
+use Mojo::Base -strict;
+use Test::Mojo;
+use Test::More;
+
+my \$t = Test::Mojo->new('$app');
+
+\$t->get_ok('/')->status_is(200);
+
+done_testing();
+
+1;
+EOF
+
+  $file->dirname->make_path;
+  $file->spew($content);
+  say "Created: $file";
 }
 
 1;
