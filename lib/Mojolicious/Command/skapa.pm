@@ -3,7 +3,7 @@ use Mojo::Base 'Mojolicious::Command', -signatures;
 use Mojo::File qw(path);
 use Mojo::Util qw(class_to_path decamelize);
 
-has description => 'Scaffolding toolkit (make:controller, make:plugin, make:moo, make:route, make:middleware, make:secret)';
+has description => 'Scaffolding toolkit (make:*, subcommands below)';
 has usage       => <<'USAGE';
 Usage: APPLICATION skapa <subcommand> [args]
 
@@ -12,8 +12,10 @@ Subcommands:
   make:plugin     <Name>   Create a plugin under lib/<App>/Plugin/
   make:moo        <Name>   Create a Moo class under lib/<App>/
   make:route      <Name>   Create a route group under lib/<App>/Route/
-  make:middleware <Name>   Create a middleware (plugin + around_action hook) under lib/<App>/Middleware/
+  make:middleware <Name>   Create a middleware under lib/<App>/Middleware/
+  make:command    <name>   Create an app command under lib/<App>/Command/
   make:secret              Generate an app secret and write to the config file
+  make:helper     <Name>   Create a plugin with an $app->helper stub under lib/<App>/Plugin/
 USAGE
 
 sub run ($self, @args) {
@@ -25,7 +27,9 @@ sub run ($self, @args) {
   elsif ($sub eq 'make:moo')          { $self->_make_moo(@args) }
   elsif ($sub eq 'make:route')        { $self->_make_route(@args) }
   elsif ($sub eq 'make:middleware')   { $self->_make_middleware(@args) }
+  elsif ($sub eq 'make:command')      { $self->_make_command(@args) }
   elsif ($sub eq 'make:secret')       { $self->_make_secret(@args) }
+  elsif ($sub eq 'make:helper')       { $self->_make_helper(@args) }
   else                                { say "Unknown skapa subcommand: $sub"; say $self->usage }
 }
 
@@ -184,17 +188,14 @@ use Mojo::Base 'Mojolicious::Plugin', -signatures;
 sub register (\$self, \$app, \$conf) {
   if (\$conf->{global}) {
     \$app->hook(around_action => sub (\$next, \$c, \$action, \$last) {
-      # --- before action ---
       my \$result = \$next->();
-      # --- after action ---
       return \$result;
     });
     return;
   }
 
-  # --- route-scoped mode (default) ---
   return \$app->routes->under(sub (\$c) {
-    # return 1 to allow, 0 to stop (e.g. after \$c->redirect_to)
+    # return 1 to allow, 0 to stop
     return 1;
   });
 }
@@ -218,6 +219,44 @@ EOF
   say 'Or globally (in startup):';
   say "  plugin '$plugin_line', { global => 1 };";
   say "  ($startup_file)";
+}
+
+sub _make_command ($self, $name) {
+  unless ($name) { say 'Usage: APPLICATION skapa make:command <name>'; return }
+
+  my $app     = $self->_app_class;
+  my $package = "${app}::Command::" . $name;
+  my $file    = $self->_target_file('Command', $name);
+
+  if (-e $file) { say "File already exists: $file"; return }
+
+  my $content = <<"EOF";
+package $package;
+use Mojo::Base 'Mojolicious::Command', -signatures;
+
+has description => '$name command';
+has usage       => "Usage: APPLICATION $name [args]\\n";
+
+sub run (\$self, \@args) {
+  say 'Hello from $name';
+}
+
+1;
+EOF
+
+  $file->dirname->make_path;
+  $file->spew($content);
+
+  my $startup_file = path($self->app->home, 'lib', class_to_path($app));
+  my $ns_line      = "push \@{\$self->commands->namespaces}, '${app}::Command';";
+
+  say "Created: $file";
+  say '';
+  say "To make it available, ensure startup in $startup_file contains:";
+  say "  $ns_line";
+  say '';
+  say "Then run it with:";
+  say "  ./script/<script-name> $name";
 }
 
 sub _make_secret ($self) {
@@ -260,6 +299,49 @@ sub _make_secret ($self) {
 
   $file->spew($new);
   say "Secret generated and written to: $file";
+}
+
+sub _make_helper ($self, $name) {
+  unless ($name) { say 'Usage: APPLICATION skapa make:helper <Name>'; return }
+
+  my $app     = $self->_app_class;
+  my $package = "${app}::Plugin::" . join('::', split m{/}, $name);
+  my $file    = $self->_target_file('Plugin', $name);
+
+  if (-e $file) { say "File already exists: $file"; return }
+
+  my $helper_name = lc($name);
+  $helper_name =~ s{/}{_}g;
+  $helper_name =~ s/([a-z])([A-Z])/$1_$2/g;
+  $helper_name = lc $helper_name;
+
+  my $content = <<"EOF";
+package $package;
+use Mojo::Base 'Mojolicious::Plugin', -signatures;
+
+sub register (\$self, \$app, \$conf) {
+  \$app->helper($helper_name => sub (\$c, \@args) {
+    return "Hello from $helper_name";
+  });
+}
+
+1;
+EOF
+
+  $file->dirname->make_path;
+  $file->spew($content);
+
+  my $startup_file = path($self->app->home, 'lib', class_to_path($app));
+  my $plugin_line  = $package;
+  $plugin_line =~ s/^${app}:://;
+
+  say "Created: $file";
+  say '';
+  say "Load it in $startup_file by adding this line inside startup:";
+  say "  plugin '$plugin_line';";
+  say '';
+  say "Then use it in controllers/templates:";
+  say "  \$c->$helper_name";
 }
 
 1;
