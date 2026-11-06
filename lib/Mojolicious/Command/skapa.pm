@@ -3,6 +3,8 @@ use Mojo::Base 'Mojolicious::Command', -signatures;
 use Mojo::File qw(path);
 use Mojo::Util qw(class_to_path decamelize);
 
+our $VERSION = '0.01';
+
 has description => 'Scaffolding toolkit (make:*, subcommands below)';
 has usage       => <<'USAGE';
 Usage: APPLICATION skapa <subcommand> [args]

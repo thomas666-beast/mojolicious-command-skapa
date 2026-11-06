@@ -1,0 +1,196 @@
+NAME
+    Mojolicious::Command::skapa - Scaffolding commands for Mojolicious
+    applications
+
+SYNOPSIS
+    # Install
+    cpanm Mojolicious::Command::skapa
+
+    # Use from any Mojolicious application
+    ./script/myapp skapa <subcommand> [args]
+
+    # Or from the "mojo" command itself
+    mojo skapa <subcommand> [args]
+
+DESCRIPTION
+    skapa (Old Norse: "to create, to shape") adds Artisan-style code
+    generation to Mojolicious. Every subcommand creates files inside the
+    current application, resolves paths from the running app's home
+    directory, refuses to overwrite existing files, and prints what to
+    do next (e.g. which "plugin '...';" line to add to startup).
+
+    The command lives in the shared Mojolicious::Command namespace, so
+    it is discovered automatically by Mojolicious::Commands from @INC.
+    No configuration, no namespace registration.
+
+SUBCOMMANDS
+    make:controller <Name>
+        Creates lib/<App>/Controller/<Name>.pm, a Mojolicious::Controller
+        subclass with a commented example action. Nested paths
+        (Admin/Reports) become nested packages
+        (<App>::Controller::Admin::Reports).
+
+    make:plugin <Name>
+        Creates lib/<App>/Plugin/<Name>.pm, a Mojolicious::Plugin
+        subclass with an empty register method. Prints the
+        "plugin '<Name>';" line to add to startup.
+
+    make:helper <Name>
+        Same file location as make:plugin, but register installs a
+        working $app->helper(<name> => sub { ... }) stub. Helper name
+        is derived from <Name> (Greeting -> greeting,
+        UserLogin -> user_login).
+
+    make:middleware <Name>
+        Creates lib/<App>/Middleware/<Name>.pm. The generated plugin
+        supports both route-scoped (returns an $app->routes->under(...)
+        subtree for a single route file) and global
+        ({ global => 1 } installs an around_action hook) modes. The
+        header comment explains both.
+
+    make:route <Name>
+        Creates lib/<App>/Route/<Name>.pm, a plugin whose register adds
+        routes to $app->routes. Prints the "plugin 'Route::<Name>';"
+        line to add to startup.
+
+    make:moo <Name>
+        Creates a plain Moo class at lib/<App>/<Name>.pm with
+        "use Moo; use strictures 2; use namespace::clean;". Useful for
+        service objects, value classes, and non-Mojolicious domain
+        classes.
+
+    make:command <name>
+        Creates lib/<App>/Command/<name>.pm, a Mojolicious::Command
+        subclass with a run method. Prints the
+        "push @{$self->commands->namespaces}, '<App>::Command';" line
+        to add to startup.
+
+    make:test <name>
+        Creates t/<name>.t with a Test::Mojo skeleton (get_ok('/') +
+        status_is(200) + done_testing). Name is decamelized
+        (UserLogin -> t/user_login.t).
+
+    make:minion <Name>
+        Creates lib/<App>/Minion/<Name>.pm, a Minion task class with
+        a method stub matching the file name. Prints the
+        "use ... ; $self->minion->add_task(<task> => '<package>');"
+        lines to add where Minion is started.
+
+    make:request <Name>
+        Creates lib/<App>/Requests/<Name>.pm, a
+        Mojolicious::Plugin::FormRequest class. Only the "rules"
+        method is generated (with a commented example inside).
+        Requires Mojolicious::Plugin::FormRequest loaded in startup.
+
+    make:translatable [locale]
+        Creates i18n/<locale>.json (default: en) with a starter key.
+        Validates the locale format (en, de, pt-BR). Refuses to
+        overwrite an existing translation file. Requires
+        Mojolicious::Plugin::Translatable loaded in startup.
+
+    make:policy <Name>
+        Creates lib/<App>/Policy/<Name>.pm, a plain class (Moo -base,
+        not a plugin) with four deny-by-default methods: view, create,
+        update, delete. Prints the
+        "plugin 'Policy' => { policies => { <Name> => '<package>' } };"
+        snippet to add to startup.
+
+    make:secret
+        Generates a cryptographically secure secret with
+        Mojo::Util::generate_secret and writes it to the app's config
+        file (derived from decamelize(ref $app), e.g. Skapa ->
+        skapa.yml). If the file already has a top-level "secrets:" key,
+        the block is replaced. If no config file exists, prints the
+        YAML block for manual copy-paste.
+
+    orm <args...>
+        Forwards to the Mimir ORM command if Mimir is loaded
+        (migrate, rollback, reset, refresh, fresh, status,
+        make:migration, make:model). Prints "Mimir is not loaded" with
+        the "plugin 'Mimir';" hint otherwise. Running "skapa orm" with
+        no args (or --help) prints a skapa-flavored summary of the
+        available ORM commands.
+
+    serve [-l URL] [-x CMD]
+        Shortcut for "morbo script/<moniker>". Passes extra args
+        straight to morbo, so -l http://*:4000 changes the port and
+        -x 'npx vite build --watch' starts an asset bundler in watch
+        mode. On a busy port, prints the listen-address hint.
+
+CONVENTIONS
+    Every generator follows the same rules:
+
+    - File path is derived from the running app's class
+      (ref $self->app) and its home directory, so the command works
+      correctly regardless of where the app lives on disk.
+    - Existing files are never overwritten. The command prints
+      "File already exists: <path>" and exits cleanly.
+    - Nothing is auto-edited in lib/<App>.pm (startup). Generators
+      print the exact line(s) the user must paste themselves.
+    - All generated packages use the app's namespace
+      (<App>::Controller::..., <App>::Model::..., etc.), not a
+      hardcoded name.
+
+INSTALLATION
+    From CPAN (once released):
+
+        cpanm Mojolicious::Command::skapa
+
+    From source:
+
+        git clone https://github.com/<you>/Mojolicious-Command-skapa.git
+        cd Mojolicious-Command-skapa
+        perl Makefile.PL
+        make
+        make install
+
+    Verification:
+
+        perl -MMojolicious::Command::skapa -e 'print "loaded\n"'
+        mojo skapa
+
+    The command should appear in the "mojo" command list and print
+    its usage block when called without a subcommand.
+
+DEPENDENCIES
+    Required:
+        Mojolicious 9.0+
+        Moo 2.0+
+
+    Optional (only if you use the matching subcommand):
+        Moo + strictures + namespace::clean  (make:moo)
+        Mojolicious::Plugin::FormRequest     (make:request)
+        Mojolicious::Plugin::Translatable    (make:translatable)
+        Mojolicious::Plugin::Policy          (make:policy)
+        Mimir                                 (orm)
+        Minion                                (make:minion)
+
+    None of the optional plugins are auto-loaded by this distribution.
+    They are used only when the matching generator is invoked; the
+    generated code requires them, but the CLI itself does not.
+
+TESTING
+    The distribution ships no tests of its own beyond a load check.
+    Run the generated code's own tests with "prove -l t/" from the
+    target application.
+
+    To verify the install without installing globally:
+
+        cpanm --local-lib=/tmp/skapa-install .
+        PERL5LIB=/tmp/skapa-install/lib/perl5 perl \
+          -MMojolicious::Command::skapa -e 'print "loaded\n"'
+
+AUTHOR
+    Thomas <selfworker112@mailfence.com>
+
+LICENSE
+    This is free software; you can redistribute it and/or modify it
+    under the same terms as Perl itself.
+
+SEE ALSO
+    Mojolicious, Mojolicious::Command, Mojolicious::Commands,
+    Mojolicious::Plugin::FormRequest,
+    Mojolicious::Plugin::Translatable,
+    Mojolicious::Plugin::Policy,
+    Mojolicious::Plugin::Mimir.
+
