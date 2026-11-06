@@ -21,6 +21,7 @@ Subcommands:
   make:translatable [locale]  Create i18n/<locale>.json (default: en)
   make:policy     <Name>   Create a policy under lib/<App>/Policy/
   serve [-l URL]           Run the app with morbo (default: http://*:3000)
+  orm <args...>            Forward to the Mimir ORM command (migrate, make:model, make:migration, ...)
   make:secret              Generate an app secret and write to the config file
 USAGE
 
@@ -42,6 +43,7 @@ sub run ($self, @args) {
   elsif ($sub eq 'make:policy')       { $self->_make_policy(@args) }
   elsif ($sub eq 'make:translatable') { $self->_make_translatable(@args) }
   elsif ($sub eq 'serve')             { $self->_serve(@args) }
+  elsif ($sub eq 'orm')               { $self->_orm(@args) }
   else                                { say "Unknown skapa subcommand: $sub"; say $self->usage }
 }
 
@@ -562,6 +564,21 @@ sub _serve ($self, @args) {
   say 'If port 3000 is busy, pick another listen address:';
   say "  APPLICATION skapa serve -l http://*:4000";
   return 1;
+}
+
+sub _orm ($self, @args) {
+  require Mimir;
+
+  my $mimir = Mimir->instance;
+  unless ($mimir) {
+    say 'Mimir is not loaded. Add this line to startup:';
+    say "  plugin 'Mimir';";
+    return 1;
+  }
+
+  require Mojolicious::Plugin::Mimir::Command::mimir;
+  my $cmd = Mojolicious::Plugin::Mimir::Command::mimir->new(app => $self->app);
+  return $cmd->run(@args);
 }
 
 1;
