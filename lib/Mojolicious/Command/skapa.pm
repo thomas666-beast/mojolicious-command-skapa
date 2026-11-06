@@ -576,6 +576,31 @@ sub _orm ($self, @args) {
     return 1;
   }
 
+  if (!@args || $args[0] =~ /^(?:-h|--help|help)$/) {
+    say 'Usage: APPLICATION skapa orm <command> [options]';
+    say '';
+    say 'Commands:';
+    say '  migrate                     Run pending migrations';
+    say '  migrate --pretend           Show the SQL only';
+    say '  migrate --step              One batch per migration';
+    say '  rollback [--step N]         Undo last batch (or last N migrations)';
+    say '  reset                       Undo everything';
+    say '  refresh                     Reset, then migrate';
+    say '  fresh                       Drop all tables, then migrate';
+    say '  status                      Show which migrations have run';
+    say '  make:migration NAME         Create a migration file';
+    say '    --create TABLE              ...with a create-table stub';
+    say '    --table TABLE               ...with an alter-table stub';
+    say '  make:model NAME             Create a model file';
+    say '    --migration                 ...and a matching migration';
+    say '';
+    say 'Options (all commands):';
+    say '  -c, --connection NAME       Use another configured connection';
+    say '';
+    say 'Run "APPLICATION skapa orm <command> --help" for command specifics.';
+    return 0;
+  }
+
   require Mojolicious::Plugin::Mimir::Command::mimir;
   my $cmd = Mojolicious::Plugin::Mimir::Command::mimir->new(app => $self->app);
   return $cmd->run(@args);
